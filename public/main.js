@@ -1,5 +1,5 @@
 
-let Edit_Enabled = 0;
+let Edit_Enabled = true;
 
 
 
@@ -11,9 +11,9 @@ const SearchBox = document.getElementById("search-box");
 
 
 
-const menu = document.getElementById("menu");
+const Menu = document.getElementById("menu");
 function setup_Menu(){
-	menu.innerHTML = `
+	Menu.innerHTML = `
 	<div id="menu-text-formatting" class="menu-entry">
 		<button class="B-Btn menu-entry-dot"><strong>B</strong></button>
 		<button class="I-Btn menu-entry-dot"><em>I</em></button>
@@ -28,12 +28,15 @@ function setup_Menu(){
 		<button class="H5-Btn menu-entry-dot">h5</button>
 		<button class="H6-Btn menu-entry-dot">h6</button>
 	</div>
-	<div id="menu-line-table" class="menu-entry">
-		<button class="line-btn menu-entry-dot">line</button>
+	<div id="menu-divider-table" class="menu-entry">
+		<button class="divider-btn menu-entry-dot">divider</button>
 		<button class="table-btn menu-entry-dot">table</button>
 	</div>
 	<div id="menu-link" class="menu-entry">
 		<button class="link-btn menu-entry-dot">link</button>
+	</div>
+	<div id="menu-newline" class="menu-entry">
+		<button class="newline-btn menu-entry-dot">newline</button>
 	</div>
 	<div id="menu-row-col" class="menu-entry">
 		<button class="rowA-btn menu-entry-dot">rw+</button>
@@ -54,11 +57,10 @@ setup_Menu();
 const EditLockBtn = document.getElementById("edit-lock-btn");
 const Content = document.getElementById("content");
 const HeaderTitle = document.getElementById("header-title");
-const Status = document.getElementById("status");
-const EditMenu = document.getElementById("menu");
 
 const LinkBtn = document.querySelector(".link-btn");
-const LineBtn = document.querySelector(".line-btn");
+const NewLineBtn = document.querySelector(".newline-btn");
+const DividerBtn = document.querySelector(".divider-btn");
 const TableBtn = document.querySelector(".table-btn");
 
 const RowAddBtn = document.querySelector(".rowA-btn");
@@ -83,48 +85,54 @@ const H6_Btn = document.querySelector(".H6-Btn");
 
 SearchBox.disabled = true;
 
-const editor = {
-	selection: null,
-	range: null,
-	selectedBlock: null,
-	currentTable: null,
-	currentCell: null
-};
+const Menu_Formatting   = document.getElementById("menu-text-formatting");
+const Menu_Headings     = document.getElementById("menu-headings");
+const Menu_DividerTable = document.getElementById("menu-divider-table");
+const Menu_Link         = document.getElementById("menu-link");
+const Menu_NewLine      = document.getElementById("menu-newline");
+const Menu_RowCol       = document.getElementById("menu-row-col");
+const Menu_Delete       = document.getElementById("menu-delete");
+const Menu_Clear        = document.getElementById("menu-clear");
 
-const Menu_Formatting = document.getElementById("menu-text-formatting");
-const Menu_Headings   = document.getElementById("menu-headings");
-const Menu_LineTable  = document.getElementById("menu-line-table");
-const Menu_Link       = document.getElementById("menu-link");
-const Menu_RowCol     = document.getElementById("menu-row-col");
-const Menu_Delete     = document.getElementById("menu-delete");
-const Menu_Clear      = document.getElementById("menu-clear");
-
+function disable_Menu(){
+	Menu_Formatting.style.display  = "none";
+	Menu_Headings.style.display    = "none";
+	Menu_DividerTable.style.display= "none";
+	Menu_Link.style.display        = "none";
+	Menu_NewLine.style.display     = "none";
+	Menu_RowCol.style.display      = "none";
+	Menu_Delete.style.display      = "none";
+	Menu_Clear.style.display       = "none";
+}
 function enable_ContentMenu(){
-	Menu_Formatting.style.display = "flex";
-	Menu_Headings.style.display   = "flex";
-	Menu_LineTable.style.display  = "flex";
-	Menu_Link.style.display       = "flex";
-	Menu_RowCol.style.display     = "none";
-	Menu_Delete.style.display     = "none";
-	Menu_Clear.style.display      = "flex";
+	Menu_Formatting.style.display  = "flex";
+	Menu_Headings.style.display    = "flex";
+	Menu_DividerTable.style.display= "flex";
+	Menu_Link.style.display        = "flex";
+	Menu_NewLine.style.display     = "none";
+	Menu_RowCol.style.display      = "none";
+	Menu_Delete.style.display      = "none";
+	Menu_Clear.style.display       = "flex";
 }
 function enable_TableMenu(){
-	Menu_Formatting.style.display = "flex";
-	Menu_Headings.style.display   = "none";
-	Menu_LineTable.style.display  = "none";
-	Menu_Link.style.display       = "flex";
-	Menu_RowCol.style.display     = "flex";
-	Menu_Delete.style.display     = "flex";
-	Menu_Clear.style.display      = "flex";
+	Menu_Formatting.style.display  = "flex";
+	Menu_Headings.style.display    = "none";
+	Menu_DividerTable.style.display= "none";
+	Menu_Link.style.display        = "flex";
+	Menu_NewLine.style.display     = "flex";
+	Menu_RowCol.style.display      = "flex";
+	Menu_Delete.style.display      = "flex";
+	Menu_Clear.style.display       = "flex";
 }
 function enable_LineMenu(){
-	Menu_Formatting.style.display = "none";
-	Menu_Headings.style.display   = "none";
-	Menu_LineTable.style.display  = "none";
-	Menu_Link.style.display       = "none";
-	Menu_RowCol.style.display     = "none";
-	Menu_Delete.style.display     = "flex";
-	Menu_Clear.style.display      = "none";
+	Menu_Formatting.style.display  = "none";
+	Menu_Headings.style.display    = "none";
+	Menu_DividerTable.style.display= "none";
+	Menu_Link.style.display        = "none";
+	Menu_NewLine.style.display     = "flex";
+	Menu_RowCol.style.display      = "none";
+	Menu_Delete.style.display      = "flex";
+	Menu_Clear.style.display       = "none";
 }
 
 content.addEventListener("keydown", e => {
@@ -157,13 +165,74 @@ content.addEventListener("keydown", e => {
 			e.preventDefault();
 	}}
 });
-function hasText(node) {
+function hasText(node){
 	const walker = document.createTreeWalker(node,NodeFilter.SHOW_TEXT);
 	return walker.nextNode() !== null;
+}
+function deleteParagraphSelection(selection){
+	
+	const range = selection.getRangeAt(0).cloneRange();
+	if(range.collapsed) return false;
+	let node = range.startContainer;
+	
+	if(node.nodeType === Node.TEXT_NODE){
+		node = node.parentElement;
+	}
+	
+	let start = node.closest(".paragraph");
+	if(!start) return true;
+	
+	let cur = start;
+	while(cur){
+		if(cur.classList.contains("paragraph")){
+			let elmrange = document.createRange();
+			elmrange.selectNodeContents(cur);
+			const overlaps = range.intersectsNode(cur);
+			const startIn = cur.contains(range.startContainer);
+			const endIn   = cur.contains(range.endContainer);
+			if(!overlaps){
+				cur = cur.nextElementSibling;
+			}else if(startIn&&endIn){
+				const r = range.cloneRange();
+				range.deleteContents();
+				r.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(r);
+				return true;
+			}else if(startIn){
+				elmrange.setStart(range.startContainer, range.startOffset);
+				elmrange.deleteContents();
+				cur = cur.nextElementSibling;
+			}else if(endIn){
+				elmrange.setEnd(range.endContainer, range.endOffset);
+				elmrange.deleteContents();
+				const r = range.cloneRange();
+				r.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(r);
+				start.append(...Array.from(cur.childNodes));
+				cur.remove();
+				return true;
+			}else{
+				let tmp = cur;
+				cur = tmp.nextElementSibling;
+				tmp.remove();
+			}
+		}else{
+			let next = cur.nextElementSibling;
+			while(next && !next.classList.contains("paragraph")){
+				next = next.nextElementSibling;
+			}
+			cur = next;
+		}
+	}
+	return true;
 }
 function handleBackspace(){
 	const selection = window.getSelection();
 	if(!selection.rangeCount) return false;
+	
+	if(deleteParagraphSelection(selection)) return true;
 	
 	const range = selection.getRangeAt(0).cloneRange();
 	let node = range.startContainer;
@@ -221,6 +290,8 @@ function handleDelete(){
 	const selection = window.getSelection();
 	if(!selection.rangeCount) return false;
 	
+	if(deleteParagraphSelection(selection)) return true;
+	
 	const range = selection.getRangeAt(0).cloneRange();
 	let node = range.startContainer;
 	
@@ -276,6 +347,8 @@ function handleEnter(){
 	const selection = window.getSelection();
 	if(!selection.rangeCount) return false;
 	
+	deleteParagraphSelection(selection);
+	
 	const range = selection.getRangeAt(0).cloneRange();
 	let node = range.startContainer;
 	
@@ -290,6 +363,9 @@ function handleEnter(){
 	startTest.selectNodeContents(paragraph);
 	startTest.setEnd(range.startContainer, range.startOffset);
 	const atStart = startTest.toString() === "";
+	
+	console.log(atStart);
+	console.log(paragraph);
 	
 	const endTest = range.cloneRange();
 	endTest.selectNodeContents(paragraph);
@@ -351,10 +427,162 @@ function handleArrowRight(){
 	return true;
 }
 
+EditLockBtn.addEventListener("click", function(){
+	Edit_Enabled = !Edit_Enabled;
+	
+	if(Edit_Enabled){
+		Content.contentEditable = "true";
+	}else{
+		Content.contentEditable = "false";
+	}
+});
+
+document.addEventListener('contextmenu', function(e){
+	if(Edit_Enabled){ e.preventDefault(); }
+});
+document.addEventListener("mousedown", function (event) {
+	if(Edit_Enabled){
+		if(event.button === 2){
+			const inside = event.target.closest("#content");
+			if(!inside){
+				disable_Menu();
+			}
+			displayMenu();
+		}
+	}
+});
+document.addEventListener("mouseup", function (event) {
+	if(Edit_Enabled){
+		if(event.button === 2){
+		}else{ Menu.style.display = "none"; }
+	}
+});
+content.addEventListener("mousedown", event => {
+	if(event.button !== 2){ return; };
+	
+	const divider = event.target.closest(".divider");
+	if(divider){
+		CurrentBlock = packET(divider,"divider");
+		enable_LineMenu();
+		return;
+	}
+	
+	const paragraph = event.target.closest(".paragraph");
+	if(paragraph){
+		CurrentBlock = packET(paragraph,"paragraph");
+		enable_ContentMenu();
+		return;
+	}
+});
+
+function displayMenu(){
+	Menu.style.display = "block";
+	Menu.style.top = event.clientY + 'px';
+	Menu.style.left = event.clientX + 'px';
+	
+	const rect = Menu.getBoundingClientRect();
+	
+	if(window.innerWidth < event.clientX + rect.width){
+		Menu.style.left = event.clientX - rect.width + 'px';
+	}
+	if(window.innerHeight < event.clientY + rect.height){
+		Menu.style.top = event.clientY - rect.height + 'px';
+	}
+}
 
 
 
+let CurrentBlock = null;
 
+//NEWLINE
+NewLineBtn.addEventListener("click", function(){
+	if(!CurrentBlock) return;
+	
+	paragraph = document.createElement("div");
+	paragraph.className = "BLOCK paragraph";
+	paragraph.appendChild(document.createElement("br"));
+	
+	paragraph.after(CurrentBlock.block.nextElementSibling);
+	CurrentBlock.block.after(paragraph);
+	
+	const r = document.createRange();
+	r.selectNodeContents(paragraph);
+	r.collapse(true);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(r);
+});
+
+
+// DIVIDER
+DividerBtn.addEventListener("click", function(){
+	const divider = document.createElement("div");
+	divider.className = "BLOCK divider";
+	divider.contentEditable = "false";
+	divider.addEventListener("mousedown", e => {
+		e.preventDefault();
+	});
+	insertBlock(divider);
+	CurrentBlock = packET(divider,"divider");
+});
+DeleteBtn.addEventListener("click", event => {
+	if(!CurrentBlock) return;
+	if(CurrentBlock.type!=="divider") return;
+	
+	CurrentBlock.block.remove();
+	CurrentBlock = null;
+});
+
+
+function splitParagraph(selection){
+	const range = selection.getRangeAt(0).cloneRange();
+	let node = range.startContainer;
+	
+	if(node.nodeType === Node.TEXT_NODE){
+		node = node.parentElement;
+	}
+	
+	let paragraph = node.closest(".paragraph");
+	if(!paragraph) return null;
+	
+	const afterRange = document.createRange();
+	afterRange.selectNodeContents(paragraph);
+	afterRange.setStart(range.startContainer, range.startOffset);
+	
+	const fragment = afterRange.extractContents();
+	
+	const newParagraph = document.createElement("div");
+	newParagraph.className = "BLOCK paragraph";
+	newParagraph.appendChild(fragment);
+	
+	return {
+		before: paragraph,
+		after: newParagraph
+	};
+}
+function insertBlock(block){
+	const selection = window.getSelection();
+	if(!selection.rangeCount) return false;
+	
+	deleteParagraphSelection(selection);
+	
+	const split = splitParagraph(selection);
+	
+	if(split){
+		split.before.after(block);
+		block.after(split.after);
+		const r = document.createRange();
+		r.selectNodeContents(split.after);
+		r.collapse(true);
+		selection.removeAllRanges();
+		selection.addRange(r);
+		return;
+	}
+	console.log("Failed To Add Block");
+}
+
+function packET(elm,type){
+	return {block:elm,type:type};
+}
 
 /*
 function _createBlock(){
@@ -806,7 +1034,7 @@ function showPopup(label, callback) {
 
 
 
-
+/*
 SaveBtn.addEventListener("click", function(){ sendHTML(); });
 function setTableEditing(enabled) {
 	const tds = content.querySelectorAll("td");
@@ -966,7 +1194,7 @@ LinkBtn.addEventListener("click", function(){
 		}
 	});
 });
-
+*/
 
 
 

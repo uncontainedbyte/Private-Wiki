@@ -138,7 +138,9 @@ button:hover{
 	
 }
 
-
+.paragraph {
+	white-space: pre-wrap;
+}
 
 
 
