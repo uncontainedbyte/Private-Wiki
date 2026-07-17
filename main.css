@@ -142,10 +142,42 @@ button:hover{
 	white-space: pre-wrap;
 }
 
+.Heading1{
+	display: inline;
+	font-size: 2em;
+	font-weight: bold;
+}
+.Heading2{
+	display: inline;
+	font-size: 1.5em;
+	font-weight: bold;
+}
+.Heading3{
+	display: inline;
+	font-size: 1.17em;
+	font-weight: bold;
+}
+.Heading4{
+	display: inline;
+	font-size: 1em;
+	font-weight: bold;
+}
+.Heading5{
+	display: inline;
+	font-size: 0.83em;
+	font-weight: bold;
+}
+.Heading6{
+	display: inline;
+	font-size: 0.67em;
+	font-weight: bold;
+}
 
-
-
-
+table{
+	margin: 0;
+}
+th{ outline: 0px solid transparent; }
+td{ outline: 0px solid transparent; }
 
 
 
