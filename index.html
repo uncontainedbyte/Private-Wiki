@@ -3,18 +3,36 @@
 <html>
 	<title>Wiki</title>
 	<link rel="stylesheet" href="main.css">
-	<script src="main.js" defer></script>
+	<script type="module" src="main.js" defer></script>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
+	<div id="page-id" hidden>-1</div>
+	<h1 id="title">Home</h1>
 	<div id="header">
-		<div id="page-id" hidden>-1</div>
-		<h1 id="title">Home</h1>
-		<a href="./000000.html">Home</a>
-		<button id="edit-lock-btn">Edit</button>
-		<button id="save-btn">Save</button>
-		<button id="create-page-btn">Create Page</button>
-		<input id="search-box" type="search" placeholder="Search" disabled="">
+		<div class="bar-paging">
+			<div class="bar">
+				<a href="?page=0">Home</a>
+				<a href="javascript:history.back()">Back</a>
+				<span id="edit-sign" style="color:red;"hidden>Editing</span>
+			</div>
+			<input class = "bar search" id="search-box" type="search" placeholder="Search" disabled="">
+		</div>
+		<div class="bar-btns">
+			<div class="bar-stack">
+				<button class = "bar" id="edit-lock-btn">Edit</button>
+				<button class = "bar" id="save-btn">Save</button>
+			</div>
+			<div class="bar-stack">
+				<button class = "bar" id="create-page-btn">Create</button>
+				<button class = "bar" id="delete-page-btn">Delete</button>
+			</div>
+			<div class="bar-stack">
+				<button class = "bar" id="backup-export-btn">Backup</button>
+				<button class = "bar" id="backup-import-btn">Restore</button>
+			</div>
+		</div>
+		<input type="file" id="fileInput" accept=".json" hidden>
 	</div>
 	<br><div id="content" contenteditable="true"></div>
 	<div id="menu" style="display: none; top: 288px; left: 48px;">

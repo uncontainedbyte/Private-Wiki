@@ -59,9 +59,11 @@ button:hover{
 
 
 
+/*
 #header button{
 	display: inline;
 }
+*/
 
 #overlay {
 	position: fixed;
@@ -179,9 +181,31 @@ table{
 th{ outline: 0px solid transparent; }
 td{ outline: 0px solid transparent; }
 
-
-
-
+#header{
+	flex-direction: row;
+	display: flex;
+}
+.bar-btns{
+	display: flex;
+	flex-direction: row;
+	width:250px;
+}
+.bar-paging{
+	flex:1;
+}
+.bar{
+	margin:0;
+	-background: transparent;
+	padding: 0;
+}
+.bar-stack{
+	flex-direction: column;
+	display: flex;
+	flex:1;
+}
+.search{
+	
+}
 
 
 

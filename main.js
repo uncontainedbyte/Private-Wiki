@@ -1,81 +1,66 @@
+import * as ST from "./storage.js";
+
+
 const blank_page_message = "this page is empty";
 
 
-let Edit_Enabled = true;
-let pageID = 0;
+let Edit_Enabled = false;
 
 
-let ID_ToTitle = null;
-let Title_ToID = null;
-function loadMaps(){
-	let saved = localStorage.getItem("ID_ToTitle");
-	if(saved){
-		ID_ToTitle = new Map(JSON.parse(saved))
-	}else{console.log("<ID_ToTitle> is null");}
-	
-	saved = localStorage.getItem("Title_ToID");
-	if(saved){
-		Title_ToID = new Map(JSON.parse(saved))
-	}else{console.log("<Title_ToID> is null");}
-}
-function saveMaps(){
-	localStorage.setItem("ID_ToTitle", JSON.stringify([...ID_ToTitle]));
-	localStorage.setItem("Title_ToID", JSON.stringify([...Title_ToID]));
-}
-function getID(){
-	return Number(document.getElementById("page-id").innerHTML);
-}
-function nextID(){
-	let id = Number(localStorage.getItem("nextID"));
-	if(!id){
-		id = 1;
-		localStorage.setItem("nextID", String(id));
-	}
-	return id;
-}
-function incermentID(){
-	let id = Number(localStorage.getItem("nextID"));
-	if(!id){
-		console.log("nextID is null, refusing to incerment");
-		return;
-	}
-	id = id+1;
-	localStorage.setItem("nextID", String(id));
-}
-function setID(id){
-	document.getElementById("page-id").innerHTML = id;
-}
-function getLastOpenPage(){
-	let n = localStorage.getItem("LastOpenPage");
-	if(!n){ n = -1; }
-	return Number(n);
-}
+
 async function setupPage(){
-	loadMaps();
-	if(!Title_ToID){
-		Title_ToID = new Map();
-		Title_ToID.set("Home",0);
-		localStorage.setItem("Title_ToID", JSON.stringify([...Title_ToID]));
+	let metaData = await ST.getMetaData();
+	if(!metaData){
+		const data = {
+			title: "Home",
+			content: "<div class=\"BLOCK paragraph\">"+blank_page_message+"</div>"
+		};
+		ST.savePage(0,data);
+		
+		metaData = {
+			version:0,
+			nextID: 1,
+			pages:{
+				lastOpenPage: 0,
+				byID:{
+					"0": "Home"
+				},
+				byTitle:{
+					"Home": "0"
+				}
+			}
+		};
+		
+		ST.setMetaData(metaData);
 	}
-	if(!ID_ToTitle){
-		ID_ToTitle = new Map();
-		ID_ToTitle.set(0,"Home");
-		localStorage.setItem("ID_ToTitle", JSON.stringify([...ID_ToTitle]));
-	}
-	let id = getID();
-	if(id===-1){// empty/new page
-		id = getLastOpenPage();
-		if(!id||id===-1){ id = 0; }
-		const params = new URLSearchParams(window.location.search);
-		const page = Number(params.get("page") || "-1");
-		if(page!==NaN&&page!==-1){ id = page; }
-		setID(id);
-		if(!ID_ToTitle.has(0)){// is new user
-			const data = {title: "Home",content: "<div class=\"BLOCK paragraph\">"+blank_page_message+"</div>"};
-			DB_save(id,data);
+	
+	let id = metaData.pages.lastOpenPage;
+	
+	const params = new URLSearchParams(window.location.search);
+	const page = Number(params.get("page") || "-1");
+	if(page!==undefined&&page!==null&&page!==NaN&&page!==-1){
+		if(Object.hasOwn(metaData.pages.byID,String(page))){
+			id = page;
 		}
 	}
+	if(page!==id){
+		if(!Object.hasOwn(metaData.pages.byID,String(metaData.pages.lastOpenPage))){
+			id = 0;
+		}
+	}
+	
 	await loadPage(id);
+}
+function getTimestamp(){
+	const now = new Date();
+	const timestamp =
+		now.getFullYear() + "-" +
+		String(now.getMonth() + 1).padStart(2, "0") + "-" +
+		String(now.getDate()).padStart(2, "0") + "_" +
+		String(now.getHours()).padStart(2, "0") + "-" +
+		String(now.getMinutes()).padStart(2, "0") + "-" +
+		String(now.getSeconds()).padStart(2, "0");
+	return timestamp;
 }
 
 //SAVE
@@ -86,92 +71,148 @@ SaveBtn.addEventListener("click", function(){
 function savePage(){
 	const C_DATA = Content.innerHTML;
 	const T_DATA = Title.innerHTML;
+	const id = Number(PageID.innerHTML);
 	
 	const data = {
 		title: T_DATA,
-		content: C_DATA
+		content: C_DATA,
+		editing: Edit_Enabled
 	};
 	
-	DB_save(getID(),data);
+	ST.savePage(id,data);
 }
 
 //LOAD
 async function loadPage(id){
-	localStorage.setItem("LastOpenPage", String(id));
+	let metaData = await ST.getMetaData();
+	if(!metaData) return;
 	
-	let page = await DB_load(id);
+	metaData.pages.lastOpenPage = id;
+	
+	let page = await ST.loadPage(id);
 	
 	Content.innerHTML = page.content;
 	Title.innerHTML = page.title;
-}
-
-//INDEXDB
-async function openDB(){
-	return new Promise((resolve, reject) => {
-		const request = indexedDB.open("myDatabase", 1);
-		
-		request.onupgradeneeded = (event) => {
-			const db = event.target.result;
-			
-			if (!db.objectStoreNames.contains("pages")) {
-				db.createObjectStore("pages", { keyPath: "id" });
-			}
-		};
-		
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-}
-function requestToPromise(request){
-	return new Promise((resolve, reject) => {
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-}
-async function DB_save(key, value){
-	const db = await openDB();
-	const tx = db.transaction("pages", "readwrite");
-	tx.objectStore("pages").put({ id: key, value });
-	await new Promise((resolve, reject) => {
-		tx.oncomplete = resolve;
-		tx.onerror = () => reject(tx.error);
-		tx.onabort = () => reject(tx.error);
-	});
-}
-async function DB_load(key){
-	const db = await openDB();
-	const tx = db.transaction("pages", "readonly");
-	return (await requestToPromise(tx.objectStore("pages").get(key))).value;
+	PageID.innerHTML = id;
+	
+	if(Object.hasOwn(page,"editing")){
+		Edit_Enabled = page.editing;
+	}else{ Edit_Enabled = false; }
+	EditingUpdate()
+	
+	ST.setMetaData(metaData);
 }
 
 //CREATE
 const CreatePageBtn = document.getElementById("create-page-btn");
 CreatePageBtn.addEventListener("click", function(){
+	popupTextInput();
 	showPopup("Enter Page Title:", async text =>{
 		if(text !== null){
 			if(text==="") return;
 			
-			if(Title_ToID.has(text)) return;
+			const metaData = await ST.getMetaData();
+			if(!metaData) return;
+			
+			if(Object.hasOwn(metaData.pages.byTitle,text)) return;
 			
 			createPage(text);
 		}
 	});
 });
-function createPage(title){
-	const id = nextID();
-	incermentID();
+async function createPage(title){
+	const metaData = await ST.getMetaData();
+	if(!metaData) return;
 	
-	ID_ToTitle.set(id,title);
-	Title_ToID.set(title,id);
+	const id = metaData.nextID;
+	metaData.nextID += 1;
 	
-	saveMaps();
+	metaData.pages.byID[String(id)] = title;
+	metaData.pages.byTitle[title] = String(id);
+	
+	ST.setMetaData(metaData);
 	
 	const data = {title: title,content: "<div class=\"BLOCK paragraph\">"+blank_page_message+"</div>"};
-	DB_save(id,data);
+	ST.savePage(id,data);
 	
 	window.location.href = `?page=${id}`;
 }
-setupPage();
+
+//DELETE
+const DeletePageBtn = document.getElementById("delete-page-btn");
+DeletePageBtn.addEventListener("click", function(){
+	const id = Number(PageID.innerHTML);
+	
+	if(id===0){
+		popupInfo();
+		showPopup("You Cant Delete The Home Page", async yes =>{});
+		return;
+	}
+	popupYesNo();
+	showPopup("Are you sure you want to delete this Page?", async yes =>{
+		if(yes!==null){
+			deletePage();
+		}
+	});
+});
+async function deletePage(){
+	const title = Title.innerHTML;
+	const id = Number(PageID.innerHTML);
+	
+	if(id===0) return;
+	
+	let metaData = await ST.getMetaData();
+	if(!metaData) return;
+	
+	delete metaData.pages.byID[String(id)];
+	delete metaData.pages.byTitle[title];
+	
+	ST.setMetaData(metaData);
+	
+	ST.deletePage(id);
+	
+	ST.loadPage(0);
+}
+
+//BACKUP
+const BackupExportBtn = document.getElementById("backup-export-btn");
+BackupExportBtn.addEventListener("click", async function(){
+	const pages = await ST.getAllPages();
+	const metaData = await ST.getMetaData();
+	
+	const backup = {
+		meta: metaData,
+		pages: pages
+	};
+	
+	const json = JSON.stringify(backup, null, 2);
+	
+	//DOWNLOAD
+	const blob = new Blob([json], { type: "application/json" });
+	const a = document.createElement("a");
+	a.href = URL.createObjectURL(blob);
+	a.download = `backup_${getTimestamp()}.json`;
+	a.click();
+	URL.revokeObjectURL(a.href);
+});
+const BackupImportBtn = document.getElementById("backup-import-btn");
+BackupImportBtn.addEventListener("click", async function(){
+	const input = document.getElementById("fileInput");
+	input.addEventListener("change", async () => {
+		const file = input.files[0];
+		if(!file) return;
+		const text = await file.text();
+		
+		const backup = JSON.parse(text);
+		
+		ST.setMetaData(backup.meta);
+		
+		for(const page of backup.pages){
+			await ST.savePage(page.id, page.value);
+		}
+	});
+	input.click();
+});
 
 
 
@@ -183,8 +224,10 @@ const SearchBox = document.getElementById("search-box");
 const Menu = document.getElementById("menu");
 
 const EditLockBtn = document.getElementById("edit-lock-btn");
+const EditSign = document.getElementById("edit-sign");
 const Content = document.getElementById("content");
 const Title = document.getElementById("title");
+const PageID = document.getElementById("page-id");
 
 const LinkBtn = document.querySelector(".link-btn");
 const NewLineBtn = document.querySelector(".newline-btn");
@@ -744,14 +787,19 @@ function setTableEditing(enabled){
 EditLockBtn.addEventListener("click", function(){
 	Edit_Enabled = !Edit_Enabled;
 	
-	if(Edit_Enabled){
+	EditingUpdate();
+});
+function EditingUpdate(){
+	if(Edit_Enabled===true){
 		Content.contentEditable = "true";
+		EditSign.hidden = false;
 		setTableEditing(true);
 	}else{
 		Content.contentEditable = "false";
+		EditSign.hidden = true;
 		setTableEditing(false);
 	}
-});
+}
 
 document.addEventListener('contextmenu', function(e){
 	if(Edit_Enabled){ e.preventDefault(); }
@@ -1223,6 +1271,23 @@ function showPopup(label, callback) {
 	popup_input.focus();
 	popupCallback = callback;
 }
+function popupYesNo(){
+	popup_okBtn.innerHTML = "Yes";
+	popup_cancelBtn.innerHTML = "No";
+	popup_input.hidden = true;
+	popup_cancelBtn.hidden = false;
+}
+function popupTextInput(){
+	popup_okBtn.innerHTML = "Ok";
+	popup_cancelBtn.innerHTML = "Cancel";
+	popup_input.hidden = false;
+	popup_cancelBtn.hidden = false;
+}
+function popupInfo(){
+	popup_okBtn.innerHTML = "Ok";
+	popup_input.hidden = true;
+	popup_cancelBtn.hidden = true;
+}
 
 //LINK
 function isURL(str){
@@ -1236,6 +1301,7 @@ LinkBtn.addEventListener("click", function(){
 	const range = selection.getRangeAt(0).cloneRange();
 	if(range.collapsed) return false;
 	
+	popupTextInput();
 	showPopup("Enter Page Title:", async text =>{
 		if(text !== null){
 			if(text==="") return;
@@ -1248,9 +1314,13 @@ LinkBtn.addEventListener("click", function(){
 				return;
 			}
 			
-			const result = Title_ToID.get(text);
+			const metaData = ST.getMetaData();
+			let result = null;
+			if(Object.hasOwn(metaData.pages.byTitle,text)){
+				result = metaData.pages.byTitle[text];
+			}
 			
-			if(result!==undefined){
+			if(result){
 				const id = result;
 				const link = `?page=${id}`;
 				
@@ -1486,6 +1556,7 @@ function packET(elm,type){
 
 
 
+setupPage();
 
 
 
@@ -1522,38 +1593,6 @@ function packET(elm,type){
 
 
 
-
-
-
-/*
-
-CreatePageBtn.addEventListener("click", function(){
-	showPopup("Enter Page Title:", async text =>{
-		if(text !== null){
-			if(text==="") return;
-			
-			const res = await fetch("/api", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json"
-				},
-				body: JSON.stringify({
-					command: "create-page",
-					title: text,
-				})
-			});
-			
-			if(res.status===403){
-				Status.innerHTML = "Page Already Exists";
-			}else{
-				const id = await res.text();
-				window.location.href = `${id}.html`;
-			}
-		}
-	});
-});
-
-*/
 
 
 
