@@ -5,7 +5,8 @@ const blank_page_message = "this page is empty";
 
 
 let Edit_Enabled = false;
-
+let UndoStack = [];
+let RedoStack = [];
 
 
 async function setupPage(){
@@ -230,6 +231,7 @@ const Title = document.getElementById("title");
 const PageID = document.getElementById("page-id");
 
 const LinkBtn = document.querySelector(".link-btn");
+const ImageBtn = document.querySelector(".image-btn");
 const NewLineBtn = document.querySelector(".newline-btn");
 const DividerBtn = document.querySelector(".divider-btn");
 const TableBtn = document.querySelector(".table-btn");
@@ -247,6 +249,12 @@ const I_Btn = document.querySelector(".I-Btn");
 const U_Btn = document.querySelector(".U-Btn");
 const S_Btn = document.querySelector(".S-Btn");
 
+const Copy_Btn = document.querySelector(".copy-btn");
+const Paste_Btn= document.querySelector(".paste-btn");
+const Cut_Btn  = document.querySelector(".cut-btn");
+const Undo_Btn = document.querySelector(".undo-btn");
+const Redo_Btn = document.querySelector(".redo-btn");
+
 const H1_Btn = document.querySelector(".H1-Btn");
 const H2_Btn = document.querySelector(".H2-Btn");
 const H3_Btn = document.querySelector(".H3-Btn");
@@ -258,7 +266,10 @@ SearchBox.disabled = true;
 
 const Menu_Formatting   = document.getElementById("menu-text-formatting");
 const Menu_Headings     = document.getElementById("menu-headings");
+const Menu_XCV          = document.getElementById("menu-XCV");
+const Menu_UndoRedo     = document.getElementById("menu-undo-redo");
 const Menu_DividerTable = document.getElementById("menu-divider-table");
+const Menu_Image        = document.getElementById("menu-image");
 const Menu_Link         = document.getElementById("menu-link");
 const Menu_NewLine      = document.getElementById("menu-newline");
 const Menu_RowCol       = document.getElementById("menu-row-col");
@@ -266,45 +277,369 @@ const Menu_Delete       = document.getElementById("menu-delete");
 const Menu_Clear        = document.getElementById("menu-clear");
 
 function disable_Menu(){
+	Menu_UndoRedo.style.display    = "none";
 	Menu_Formatting.style.display  = "none";
 	Menu_Headings.style.display    = "none";
+	Menu_XCV.style.display         = "none";
 	Menu_DividerTable.style.display= "none";
 	Menu_Link.style.display        = "none";
+	Menu_Image.style.display       = "none";
 	Menu_NewLine.style.display     = "none";
 	Menu_RowCol.style.display      = "none";
 	Menu_Delete.style.display      = "none";
 	Menu_Clear.style.display       = "none";
 }
 function enable_ContentMenu(){
+	Menu_UndoRedo.style.display    = "flex";
 	Menu_Formatting.style.display  = "flex";
 	Menu_Headings.style.display    = "flex";
+	Menu_XCV.style.display         = "flex";
 	Menu_DividerTable.style.display= "flex";
 	Menu_Link.style.display        = "flex";
+	Menu_Image.style.display       = "flex";
 	Menu_NewLine.style.display     = "none";
 	Menu_RowCol.style.display      = "none";
 	Menu_Delete.style.display      = "none";
 	Menu_Clear.style.display       = "flex";
 }
 function enable_TableMenu(){
+	Menu_UndoRedo.style.display    = "flex";
 	Menu_Formatting.style.display  = "flex";
-	Menu_Headings.style.display    = "none";
+	Menu_Headings.style.display    = "flex";
+	Menu_XCV.style.display         = "flex";
 	Menu_DividerTable.style.display= "none";
 	Menu_Link.style.display        = "flex";
+	Menu_Image.style.display       = "flex";
 	Menu_NewLine.style.display     = "flex";
 	Menu_RowCol.style.display      = "flex";
 	Menu_Delete.style.display      = "flex";
 	Menu_Clear.style.display       = "flex";
 }
 function enable_LineMenu(){
+	Menu_UndoRedo.style.display    = "flex";
 	Menu_Formatting.style.display  = "none";
 	Menu_Headings.style.display    = "none";
+	Menu_XCV.style.display         = "none";
 	Menu_DividerTable.style.display= "none";
 	Menu_Link.style.display        = "none";
+	Menu_Image.style.display       = "none";
 	Menu_NewLine.style.display     = "flex";
 	Menu_RowCol.style.display      = "none";
 	Menu_Delete.style.display      = "flex";
 	Menu_Clear.style.display       = "none";
 }
+function enable_ImageMenu(){
+	Menu_UndoRedo.style.display    = "flex";
+	Menu_Formatting.style.display  = "none";
+	Menu_Headings.style.display    = "none";
+	Menu_XCV.style.display         = "none";
+	Menu_DividerTable.style.display= "none";
+	Menu_Link.style.display        = "none";
+	Menu_Image.style.display       = "none";
+	Menu_NewLine.style.display     = "flex";
+	Menu_RowCol.style.display      = "none";
+	Menu_Delete.style.display      = "flex";
+	Menu_Clear.style.display       = "none";
+}
+
+//CTRL+C,V,X,S,D,Z,Y
+document.addEventListener("keydown", e => {
+	if(!event.ctrlKey) return;
+	if(e.key.toLowerCase() === "s"){
+		e.preventDefault();
+		handleCtrlS();
+	}
+	if(!Edit_Enabled) return;
+	if(e.key.toLowerCase() === "z"){
+		if(handleCtrlZ()){
+			e.preventDefault();
+	}}
+	if(e.key.toLowerCase() === "y"){
+		if(handleCtrlY()){
+			e.preventDefault();
+	}}
+});
+document.addEventListener("keydown", e => {
+	if(!Edit_Enabled) return;
+	if(!event.ctrlKey) return;
+	if(e.key.toLowerCase() === "d"){
+		if(handleCtrlD()){
+			e.preventDefault();
+	}}
+});
+document.addEventListener("copy", async (event) => {
+	if(!Edit_Enabled) return;
+	if(await handleCtrlC()) event.preventDefault();
+});
+document.addEventListener("cut", async (event) => {
+	if(!Edit_Enabled) return;
+	if(await handleCtrlX()) event.preventDefault();
+});
+document.addEventListener("paste", async (event) => {
+	if(!Edit_Enabled) return;
+	if(popupActive) return;
+	handleCtrlV(event);
+});
+async function handleCtrlX(){
+	const selection = window.getSelection();
+	if(!selection.rangeCount) return false;
+	const range = selection.getRangeAt(0).cloneRange();
+	pushUndo();
+	
+	await navigator.clipboard.writeText(selection.toString());
+	if(insideTable(range)){
+		range.deleteContents();
+	}else{
+		deleteParagraphSelection(selection);
+	}
+	return true;
+}
+async function handleCtrlC(){
+	const selection = window.getSelection();
+	if(!selection.rangeCount) return false;
+	const range = selection.getRangeAt(0).cloneRange();
+	await navigator.clipboard.writeText(selection.toString());
+	return true;
+}
+async function handleCtrlV(event){
+	
+	const selection = window.getSelection();
+	if(!selection.rangeCount) return false;
+	
+	const range = selection.getRangeAt(0).cloneRange();
+	
+	if(insideTable(range)){
+		return Table_handleCtrlV(selection,range,text);
+	}
+	
+	let node = range.startContainer;
+	
+	if(node.nodeType === Node.TEXT_NODE){
+		node = node.parentElement;
+	}
+	
+	const paragraph = node.closest(".paragraph");
+	if(!paragraph) return false;
+	
+	event.preventDefault();
+	pushUndo();
+	
+	deleteParagraphSelection(selection);
+	
+	try{
+		const items = await navigator.clipboard.read();
+		for(const item of items){
+			for(const type of item.types){
+				if(type.startsWith("image/")){
+					const blob = await item.getType(type);
+					const img = document.createElement("div");
+					img.className = "BLOCK image";
+					img.contentEditable = "false";
+					const i = document.createElement("img");
+					i.src = URL.createObjectURL(blob);
+					const resizer = document.createElement("div");
+					resizer.className = "resize-handle";
+					img.addEventListener("mousedown", e => {e.preventDefault();});
+					
+					img.append(i);
+					img.append(resizer);
+					insertBlock(img);
+					CurrentBlock = packET(img,"image");
+					return true;
+				}
+			}
+		}
+		console.log("No image found in clipboard.");
+	}catch(err){
+		console.error(err);
+	}
+	
+	const text = await navigator.clipboard.readText();
+	
+	const lines = text.split(/\r?\n/);
+	
+	const startTest = range.cloneRange();
+	startTest.selectNodeContents(paragraph);
+	startTest.setEnd(range.startContainer, range.startOffset);
+	const atStart = startTest.toString() === "";
+	
+	const endTest = range.cloneRange();
+	endTest.selectNodeContents(paragraph);
+	endTest.setStart(range.startContainer, range.startOffset);
+	const atEnd = endTest.toString() === "";
+	
+	let current = paragraph;
+	let previous = null;
+	if(atEnd){
+		for(const line of lines){
+			if(line !== ""){
+				current.append(line);
+			}else{
+				current.append(document.createElement("br"));
+			}
+			let newParagraph = document.createElement("div");
+			newParagraph.className = "BLOCK paragraph";
+			current.after(newParagraph);
+			previous = current;
+			current = newParagraph;
+		}
+		current.remove();
+		current = previous;
+	}else if(atStart){
+		let fragment = document.createDocumentFragment();
+		fragment.append(...current.childNodes);
+		
+		for(const line of lines){
+			if(line !== ""){
+				current.append(line);
+			}else{
+				current.append(document.createElement("br"));
+			}
+			let newParagraph = document.createElement("div");
+			newParagraph.className = "BLOCK paragraph";
+			current.after(newParagraph);
+			previous = current;
+			current = newParagraph;
+		}
+		current.remove();
+		previous.appendChild(fragment);
+		current = previous;
+	}else{
+		const afterRange = document.createRange();
+		afterRange.selectNodeContents(paragraph);
+		afterRange.setStart(range.startContainer, range.startOffset);
+		const fragment = afterRange.extractContents();
+		
+		for(const line of lines){
+			if(line !== ""){
+				current.append(line);
+			}else{
+				current.append(document.createElement("br"));
+			}
+			let newParagraph = document.createElement("div");
+			newParagraph.className = "BLOCK paragraph";
+			current.after(newParagraph);
+			previous = current;
+			current = newParagraph;
+		}
+		current.remove();
+		previous.appendChild(fragment);
+		current = previous;
+	}
+	
+	const newRange = range.cloneRange();
+	
+	newRange.collapse(true);
+	
+	selection.removeAllRanges();
+	selection.addRange(newRange);
+	
+	return true;
+}
+function handleCtrlS(){
+	savePage();
+}
+function handleCtrlD(){
+	const selection = window.getSelection();
+	if(!selection.rangeCount) return false;
+	
+	const range = selection.getRangeAt(0).cloneRange();
+	let node = range.startContainer;
+	
+	if(node.nodeType === Node.TEXT_NODE){
+		node = node.parentElement;
+	}
+	
+	const paragraph = node.closest(".paragraph");
+	if(!paragraph) return false;
+	
+	const copy = paragraph.cloneNode(true);
+	
+	pushUndo();
+	
+	paragraph.after(copy);
+	
+	return true;
+}
+function captureState(){
+	let sel = {start:-1,end:-1};;
+	const range = window.getSelection().getRangeAt(0);
+	if(window.getSelection().rangeCount){
+		const startRange = document.createRange();
+		startRange.selectNodeContents(Content);
+		startRange.setEnd(range.startContainer, range.startOffset);
+		
+		const start = startRange.toString().length;
+		const end = start + range.toString().length;
+		
+		sel = {
+			start: start,
+			end: end,
+		};
+	}
+	const state = {
+		content: Content.innerHTML,
+		select: sel
+	};
+	return state;
+}
+function getTextPosition(root, charOffset) {
+	const walker = document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+	
+	let node;
+	let remaining = charOffset;
+	
+	while((node = walker.nextNode())){
+		const len = node.textContent.length;
+		
+		if(remaining <= len){
+			return {node,offset: remaining};
+		}
+		
+		remaining -= len;
+	}
+	
+	return {
+		node: root,
+		offset: root.childNodes.length
+	};
+}
+function restoreState(state){
+	Content.innerHTML = state.content;
+	
+	
+	
+	if(state.select.start === -1 || state.select.end === -1) return;
+	
+	const selection = window.getSelection();
+	const range = document.createRange();
+	const start = getTextPosition(Content, state.select.start);
+	const end = getTextPosition(Content, state.select.end);
+	range.setStart(start.node, start.offset);
+	range.setEnd(end.node, end.offset);
+	selection.removeAllRanges();
+	selection.addRange(range);
+}
+function pushUndo(){
+	UndoStack.push(captureState());
+	RedoStack.length = 0;
+}
+function handleCtrlZ(){
+	if(UndoStack.length===0) return false;
+	const previous = UndoStack.pop();
+	RedoStack.push(captureState());
+	restoreState(previous);
+	return true;
+}
+function handleCtrlY(){
+	if(RedoStack.length===0) return false;
+	const next = RedoStack.pop();
+	UndoStack.push(captureState());
+	restoreState(next);
+	return true;
+}
+
+
 
 content.addEventListener("keydown", e => {
 	if(e.key === "Backspace"){
@@ -417,6 +752,8 @@ function handleBackspace(){
 	const selection = window.getSelection();
 	if(!selection.rangeCount) return false;
 	
+	pushUndo();
+	
 	if(deleteParagraphSelection(selection)) return true;
 	
 	const range = selection.getRangeAt(0).cloneRange();
@@ -475,6 +812,8 @@ function handleDelete(){
 	const selection = window.getSelection();
 	if(!selection.rangeCount) return false;
 	
+	pushUndo();
+	
 	if(deleteParagraphSelection(selection)) return true;
 	
 	const range = selection.getRangeAt(0).cloneRange();
@@ -531,6 +870,8 @@ function handleDelete(){
 function handleEnter(){
 	const selection = window.getSelection();
 	if(!selection.rangeCount) return false;
+	
+	pushUndo();
 	
 	deleteParagraphSelection(selection);
 	
@@ -777,6 +1118,17 @@ function handleArrowRight(){
 	return true;
 }
 
+function setImageEditing(enabled){
+	if(enabled){
+		document.querySelectorAll(".resize-handle-off").forEach(element => {
+			element.className = "resize-handle";
+		});
+	}else{
+		document.querySelectorAll(".resize-handle").forEach(element => {
+			element.className = "resize-handle-off";
+		});
+	}
+}
 function setTableEditing(enabled){
 	const tds = content.querySelectorAll("td");
 	
@@ -794,15 +1146,17 @@ function EditingUpdate(){
 		Content.contentEditable = "true";
 		EditSign.hidden = false;
 		setTableEditing(true);
+		setImageEditing(true);
 	}else{
 		Content.contentEditable = "false";
 		EditSign.hidden = true;
 		setTableEditing(false);
+		setImageEditing(false);
 	}
 }
 
 document.addEventListener('contextmenu', function(e){
-	if(Edit_Enabled){ e.preventDefault(); }
+	if(Edit_Enabled&&popupActive==false){ e.preventDefault(); }
 });
 document.addEventListener("mousedown", function (event) {
 	if(Edit_Enabled){
@@ -828,6 +1182,13 @@ content.addEventListener("mousedown", event => {
 	if(divider){
 		CurrentBlock = packET(divider,"divider");
 		enable_LineMenu();
+		return;
+	}
+	
+	const image = event.target.closest(".image");
+	if(image){
+		CurrentBlock = packET(image,"image");
+		enable_ImageMenu();
 		return;
 	}
 	
@@ -870,7 +1231,9 @@ let CurrentBlock = null;
 NewLineBtn.addEventListener("click", function(){
 	if(!CurrentBlock) return;
 	
-	paragraph = document.createElement("div");
+	pushUndo();
+	
+	let paragraph = document.createElement("div");
 	paragraph.className = "BLOCK paragraph";
 	paragraph.appendChild(document.createElement("br"));
 	
@@ -884,14 +1247,78 @@ NewLineBtn.addEventListener("click", function(){
 	window.getSelection().addRange(r);
 });
 
+//IMAGE
+let activeResize = null;
+document.addEventListener("pointermove", (e) => {
+	if(!activeResize) return;
+	const dx = e.clientX - activeResize.startX;
+	const width = Math.max(50,activeResize.startWidth + dx);
+	activeResize.wrapper.style.width = `${width}px`;
+});
+document.addEventListener("pointerup", () => {
+	activeResize = null;
+});
+document.addEventListener("pointerdown", (e) => {
+	if(!Edit_Enabled) return;
+	const handle = e.target.closest(".resize-handle");
+	if(!handle) return;
+	
+	e.preventDefault();
+	
+	const wrapper = handle.closest(".image");
+	
+	activeResize = {
+		wrapper,
+		startX: e.clientX,
+		startWidth: wrapper.offsetWidth
+	};
+});
+ImageBtn.addEventListener("click", function(){
+	const selection = window.getSelection();
+	if(!selection.rangeCount) return;
+	const range = selection.getRangeAt(0).cloneRange();
+	
+	popupImageInput();
+	showPopup("Select Image", async text =>{
+		if(text===null) return;
+		if(!popupImage) return;
+		if(popupImage.value===null) return;
+		
+		window.getSelection().removeAllRanges();
+		window.getSelection().addRange(range);
+		deleteParagraphSelection(window.getSelection());
+		
+		const img = document.createElement("div");
+		img.className = "BLOCK image";
+		img.contentEditable = "false";
+		const i = document.createElement("img");
+		i.src = popupImage.value;
+		const resizer = document.createElement("div");
+		resizer.className = "resize-handle";
+		img.addEventListener("mousedown", e => {e.preventDefault();});
+		
+		img.append(i);
+		img.append(resizer);
+		insertBlock(img);
+		CurrentBlock = packET(img,"image");
+	});
+});
+DeleteBtn.addEventListener("click", event => {
+	if(!CurrentBlock) return;
+	if(CurrentBlock.type!=="image") return;
+	
+	pushUndo();
+	
+	CurrentBlock.block.remove();
+	CurrentBlock = null;
+});
+
 // DIVIDER
 DividerBtn.addEventListener("click", function(){
 	const divider = document.createElement("div");
 	divider.className = "BLOCK divider";
 	divider.contentEditable = "false";
-	divider.addEventListener("mousedown", e => {
-		e.preventDefault();
-	});
+	divider.addEventListener("mousedown", e => {e.preventDefault();});
 	insertBlock(divider);
 	CurrentBlock = packET(divider,"divider");
 });
@@ -899,9 +1326,18 @@ DeleteBtn.addEventListener("click", event => {
 	if(!CurrentBlock) return;
 	if(CurrentBlock.type!=="divider") return;
 	
+	pushUndo();
+	
 	CurrentBlock.block.remove();
 	CurrentBlock = null;
 });
+
+// COPY/PASTE/CUT/UNDO/REDO
+Copy_Btn.addEventListener("click", async function(){await handleCtrlC();});
+Paste_Btn.addEventListener("click",async function(){await handleCtrlV();});
+Cut_Btn.addEventListener("click",  async function(){await handleCtrlX();});
+Undo_Btn.addEventListener("click", async function(){await handleCtrlZ();});
+Redo_Btn.addEventListener("click", async function(){await handleCtrlY();});
 
 //FORMATTING
  B_Btn.addEventListener("click", function(){wrapBasic("strong");});
@@ -945,6 +1381,8 @@ ClearBtn.addEventListener("click", function(){
 	if(!content.contains(range.commonAncestorContainer)) return;
 	const walker = document.createTreeWalker(content,NodeFilter.SHOW_ELEMENT);
 	
+	pushUndo();
+	
 	const toRemove = [];
 	while(walker.nextNode()){
 		const node = walker.currentNode;
@@ -975,6 +1413,8 @@ DeleteBtn.addEventListener("click", function(){
 	if(!CurrentBlock) return;
 	if(CurrentBlock.type!=="table") return;
 	
+	pushUndo();
+	
 	CurrentBlock.block.remove();
 	CurrentBlock = null;
 });
@@ -985,6 +1425,8 @@ RowAddBtn.addEventListener("click", function(){
 	
 	const row = CurrentBlock.cell.parentElement;
 	const newRow = row.cloneNode(true);
+	
+	pushUndo();
 	
 	for(const cell of newRow.cells){
 		cell.contentEditable = "true";
@@ -1002,6 +1444,8 @@ RowDelBtn.addEventListener("click", function(){
 	
 	if(CurrentBlock.block.rows.length <= 1) return;
 	
+	pushUndo();
+	
 	row.remove();
 	
 	CurrentBlock.cell = null;
@@ -1012,6 +1456,8 @@ ColumnAddBtn.addEventListener("click", function(){
 	if(!CurrentBlock.block || !CurrentBlock.cell) return;
 	
 	const col = CurrentBlock.cell.cellIndex;
+	
+	pushUndo();
 	
 	for(const row of CurrentBlock.block.rows){
 		const cell = row.insertCell(col + 1);
@@ -1027,6 +1473,8 @@ ColumnDelBtn.addEventListener("click", function(){
 	const col = CurrentBlock.cell.cellIndex;
 	
 	if(CurrentBlock.block.rows[0].cells.length <= 1) return;
+	
+	pushUndo();
 	
 	for(const row of CurrentBlock.block.rows){
 		row.deleteCell(col);
@@ -1213,6 +1661,8 @@ function Table_wrapBasic(selection,range,fm){
 	let cell = node.closest("td");
 	if(!cell) return true;
 	
+	pushUndo();
+	
 	const r = range.cloneRange();
 	const format = document.createElement(fm);
 	format.className = "FORMAT";
@@ -1234,6 +1684,8 @@ function Table_wrapAdvan(selection,range,elm){
 	let cell = node.closest("td");
 	if(!cell) return true;
 	
+	pushUndo();
+	
 	const r = range.cloneRange();
 	const fragment = range.extractContents();
 	elm.appendChild(fragment);
@@ -1242,6 +1694,29 @@ function Table_wrapAdvan(selection,range,elm){
 	selection.removeAllRanges();
 	selection.addRange(r);
 }
+function Table_handleCtrlV(selection,range,text){
+	
+	let node = range.startContainer;
+	
+	if(node.nodeType === Node.TEXT_NODE){
+		node = node.parentElement;
+	}
+	
+	let cell = node.closest("td");
+	if(!cell) return true;
+	
+	pushUndo();
+	
+	range.deleteContents();
+	
+	const r = range.cloneRange();
+	range.insertNode(document.createTextNode(text));
+	r.collapse(false);
+	selection.removeAllRanges();
+	selection.addRange(r);
+	
+	return true;
+}
 
 //POPUP OVERLAY
 const overlay = document.getElementById("overlay");
@@ -1249,19 +1724,86 @@ const popup = document.getElementById("popup");
 const popup_input = document.getElementById("popupInput");
 const popup_okBtn = document.getElementById("popup-okBtn");
 const popup_cancelBtn = document.getElementById("popup-cancelBtn");
+const popup_file = document.getElementById("popupFile");
+const dropZone = document.getElementById("dropZone");
 let popupCallback = null;
+let popupImage = {isURL: false,value: null};
+let popupActive = false;
+dropZone.addEventListener("dragenter", () => {dropZone.classList.add("dragover");});
+dropZone.addEventListener("dragleave", () => {dropZone.classList.remove("dragover");});
+dropZone.addEventListener("drop", () => {dropZone.classList.remove("dragover");});
+dropZone.addEventListener("click", () => popup_file.click());
+popup_file.addEventListener("change", () => {
+	for(const file of popup_file.files){
+		popup_handleFile(file);
+	}
+});
+dropZone.addEventListener("dragover", (e) => {e.preventDefault();});
+dropZone.addEventListener("drop", (e) => {
+	e.preventDefault();
+	for(const file of e.dataTransfer.files){
+		popup_handleFile(file);
+	}
+});
+dropZone.addEventListener("paste", async (e) => {
+	if(!popupActive) return;
+	e.preventDefault();
+	
+	for(const item of e.clipboardData.items){
+		if(item.type.startsWith("image/")){
+		const file = item.getAsFile();
+		if(file){
+			popup_handleFile(file);
+			return;
+		}
+		}
+	}
+	
+	const text = e.clipboardData.getData("text/plain").trim();
+	if(text){
+		try{
+			const url = new URL(text);
+			
+			popup_handleImageURL(url.href);
+		}catch{}
+	}
+});
+function popup_handleImageURL(url){
+	dropZone.innerHTML = url;
+	popupImage = {isURL: true,value: url};
+}
+function popup_handleFile(file) {
+	const reader = new FileReader();
+	reader.onload = () => {
+		const img = document.createElement("img");
+		img.src = reader.result;
+		img.style.maxWidth = "200px";
+		img.style.maxHeight = "200px";
+		
+		dropZone.innerHTML = "";
+		dropZone.append(img);
+		popupImage = {
+			isURL: false,
+			value: reader.result
+		};
+	};
+	reader.readAsDataURL(file);
+}
 popup_input.addEventListener("keydown", (e) => {
 	if(e.key !== "Enter") return;
 	e.preventDefault();
 	overlay.hidden = true;
+	popupActive = false;
 	if(popupCallback) popupCallback(popup_input.value);
 });
 popup_okBtn.addEventListener("click", () => {
 	overlay.hidden = true;
+	popupActive = false;
 	if(popupCallback) popupCallback(popup_input.value);
 });
 popup_cancelBtn.addEventListener("click", () => {
 	overlay.hidden = true;
+	popupActive = false;
 	if(popupCallback) popupCallback(null);
 });
 function showPopup(label, callback) {
@@ -1270,23 +1812,35 @@ function showPopup(label, callback) {
 	overlay.hidden = false;
 	popup_input.focus();
 	popupCallback = callback;
+	popupActive = true;
 }
 function popupYesNo(){
 	popup_okBtn.innerHTML = "Yes";
 	popup_cancelBtn.innerHTML = "No";
 	popup_input.hidden = true;
 	popup_cancelBtn.hidden = false;
+	dropZone.hidden = true;
 }
 function popupTextInput(){
 	popup_okBtn.innerHTML = "Ok";
 	popup_cancelBtn.innerHTML = "Cancel";
 	popup_input.hidden = false;
 	popup_cancelBtn.hidden = false;
+	dropZone.hidden = true;
 }
 function popupInfo(){
 	popup_okBtn.innerHTML = "Ok";
 	popup_input.hidden = true;
 	popup_cancelBtn.hidden = true;
+	dropZone.hidden = true;
+}
+function popupImageInput(){
+	popup_okBtn.innerHTML = "Ok";
+	popup_cancelBtn.innerHTML = "Cancel";
+	popup_input.hidden = true;
+	popup_cancelBtn.hidden = false;
+	dropZone.hidden = false;
+	dropZone.innerHTML = "";
 }
 
 //LINK
@@ -1335,7 +1889,10 @@ LinkBtn.addEventListener("click", function(){
 
 
 
-function splitParagraph(selection){
+function splitParagraph(){
+	const selection = window.getSelection();
+	if(!selection.rangeCount) return false;
+	
 	const range = selection.getRangeAt(0).cloneRange();
 	let node = range.startContainer;
 	
@@ -1356,19 +1913,11 @@ function splitParagraph(selection){
 	newParagraph.className = "BLOCK paragraph";
 	newParagraph.appendChild(fragment);
 	
-	let test = range.cloneRange();
-	test.selectNodeContents(paragraph);
-	test.setEnd(range.startContainer, range.startOffset);
-	let empty = test.toString().length === 0;
-	if(empty){
+	if(!paragraph.hasChildNodes() || paragraph.textContent.length === 0){
 		paragraph.innerHTML = "<br>";
 	}
 	
-	test = range.cloneRange();
-	test.selectNodeContents(newParagraph);
-	test.setEnd(range.startContainer, range.startOffset);
-	empty = test.toString().length === 0;
-	if(empty){
+	if(!newParagraph.hasChildNodes() || newParagraph.textContent.length === 0){
 		newParagraph.innerHTML = "<br>";
 	}
 	
@@ -1381,9 +1930,11 @@ function insertBlock(block){
 	const selection = window.getSelection();
 	if(!selection.rangeCount) return false;
 	
+	pushUndo();
+	
 	deleteParagraphSelection(selection);
 	
-	const split = splitParagraph(selection);
+	const split = splitParagraph();
 	
 	if(split){
 		split.before.after(block);
@@ -1415,6 +1966,8 @@ function wrapBasic(fm){
 	
 	let start = node.closest(".paragraph");
 	if(!start) return true;
+	
+	pushUndo();
 	
 	let cur = start;
 	while(cur){
@@ -1494,6 +2047,8 @@ function wrapAdvan(elm,range=null){
 	
 	let start = node.closest(".paragraph");
 	if(!start) return true;
+	
+	pushUndo();
 	
 	let cur = start;
 	while(cur){

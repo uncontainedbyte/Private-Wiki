@@ -50,12 +50,24 @@
 			<button class="H5-Btn menu-entry-dot">h5</button>
 			<button class="H6-Btn menu-entry-dot">h6</button>
 		</div>
+		<div id="menu-XCV" class="menu-entry">
+			<button class="copy-btn menu-entry-dot">copy</button>
+			<button class="paste-btn menu-entry-dot">paste</button>
+			<button class="cut-btn menu-entry-dot">cut</button>
+		</div>
+		<div id="menu-undo-redo" class="menu-entry">
+			<button class="undo-btn menu-entry-dot">undo</button>
+			<button class="redo-btn menu-entry-dot">redo</button>
+		</div>
 		<div id="menu-divider-table" class="menu-entry">
 			<button class="divider-btn menu-entry-dot">divider</button>
 			<button class="table-btn menu-entry-dot">table</button>
 		</div>
 		<div id="menu-link" class="menu-entry">
 			<button class="link-btn menu-entry-dot">link</button>
+		</div>
+		<div id="menu-image" class="menu-entry">
+			<button class="image-btn menu-entry-dot">image</button>
 		</div>
 		<div id="menu-newline" class="menu-entry">
 			<button class="newline-btn menu-entry-dot">newline</button>
@@ -77,6 +89,8 @@
 		<div id="popup">
 			<label for="popupInput">Enter Page Title:</label><br>
 			<input id="popupInput" type="text">
+			<div id="dropZone" contentEditable="true" data-placeholder="Drop an image here, paste one, paste link or click to select."></div>
+			<input id="popupFile" type="file" accept="image/*" hidden>
 			<button id="popup-okBtn">OK</button>
 			<button id="popup-cancelBtn">Cancel</button>
 		</div>
