@@ -9,6 +9,60 @@ let UndoStack = [];
 let RedoStack = [];
 
 
+
+
+
+function getClosest(range,elmName){
+	let node = range.startContainer;
+	
+	if(node.nodeType === Node.TEXT_NODE){
+		node = node.parentElement;
+	}
+	
+	let cell = node.closest("td");
+}
+function getRange(selection){
+	if(!selection.rangeCount) return null;
+	return selection.getRangeAt(0).cloneRange();
+}
+function selectElm(elm){
+	const r = document.createRange();
+	r.selectNodeContents(elm);
+	return r;
+}
+function setSelect(range,collapse){
+	range.collapse(collapse);
+	window.getSelection().removeAllRanges();
+	window.getSelection().addRange(range);
+}
+function extractRange(paragraph,range,selectAll=false){
+	const afterRange = document.createRange();
+	afterRange.selectNodeContents(paragraph);
+	if(!selectAll) afterRange.setStart(range.startContainer, range.startOffset);
+	return afterRange.extractContents();
+}
+function isAtEnd(range,elm,isStart){
+	const test = range.cloneRange();
+	test.selectNodeContents(elm);
+	if(!Start) test.setStart(range.startContainer, range.startOffset);
+	if(Start) test.setEnd(range.startContainer, range.startOffset);
+	return (test.toString() === "");
+}
+function getOffset(elm,range){
+	const before = document.createRange();
+	before.selectNodeContents(elm);
+	before.setEnd(range.startContainer, range.startOffset);
+	return before.toString().length;
+}
+function findNextElm(elm,type,isNext){
+	let result = (isNext)?elm.nextElementSibling:elm.previousElementSibling;
+	while(next && !result.classList.contains(type)){
+		result = (isNext)?result.nextElementSibling:result.previousElementSibling;
+	}
+	return result;
+}
+
+
 async function setupPage(){
 	let metaData = await ST.getMetaData();
 	if(!metaData){
@@ -351,21 +405,18 @@ document.addEventListener("keydown", e => {
 	}
 	if(!Edit_Enabled) return;
 	if(e.key.toLowerCase() === "z"){
-		if(handleCtrlZ()){
-			e.preventDefault();
-	}}
+		if(handleCtrlZ()) e.preventDefault();
+	}
 	if(e.key.toLowerCase() === "y"){
-		if(handleCtrlY()){
-			e.preventDefault();
-	}}
+		if(handleCtrlY()) e.preventDefault();
+	}
 });
 document.addEventListener("keydown", e => {
 	if(!Edit_Enabled) return;
 	if(!event.ctrlKey) return;
 	if(e.key.toLowerCase() === "d"){
-		if(handleCtrlD()){
-			e.preventDefault();
-	}}
+		if(handleCtrlD()) e.preventDefault();
+	}
 });
 document.addEventListener("copy", async (event) => {
 	if(!Edit_Enabled) return;
@@ -382,8 +433,8 @@ document.addEventListener("paste", async (event) => {
 });
 async function handleCtrlX(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	pushUndo();
 	
 	await navigator.clipboard.writeText(selection.toString());
@@ -396,29 +447,22 @@ async function handleCtrlX(){
 }
 async function handleCtrlC(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	await navigator.clipboard.writeText(selection.toString());
 	return true;
 }
 async function handleCtrlV(event){
 	
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	
 	if(insideTable(range)){
 		return Table_handleCtrlV(selection,range,text);
 	}
 	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
 	event.preventDefault();
@@ -458,70 +502,40 @@ async function handleCtrlV(event){
 	
 	const lines = text.split(/\r?\n/);
 	
-	const startTest = range.cloneRange();
-	startTest.selectNodeContents(paragraph);
-	startTest.setEnd(range.startContainer, range.startOffset);
-	const atStart = startTest.toString() === "";
-	
-	const endTest = range.cloneRange();
-	endTest.selectNodeContents(paragraph);
-	endTest.setStart(range.startContainer, range.startOffset);
-	const atEnd = endTest.toString() === "";
+	const atStart = isAtEnd(range,paragraph,true);
+	const atEnd = isAtEnd(range,paragraph,false);
 	
 	let current = paragraph;
 	let previous = null;
-	if(atEnd){
-		for(const line of lines){
-			if(line !== ""){
-				current.append(line);
-			}else{
-				current.append(document.createElement("br"));
-			}
-			let newParagraph = document.createElement("div");
-			newParagraph.className = "BLOCK paragraph";
-			current.after(newParagraph);
-			previous = current;
-			current = newParagraph;
+	let fragment = null;
+	if(atStart){
+		fragment = document.createDocumentFragment();
+		fragment.append(...current.childNodes);
+	}else{
+		fragment = extractRange(paragraph,range);
+	}
+	
+	for(const line of lines){
+		if(line !== ""){
+			current.append(line);
+		}else{
+			current.append(document.createElement("br"));
 		}
+		let newParagraph = document.createElement("div");
+		newParagraph.className = "BLOCK paragraph";
+		current.after(newParagraph);
+		previous = current;
+		current = newParagraph;
+	}
+	
+	if(atEnd){
 		current.remove();
 		current = previous;
 	}else if(atStart){
-		let fragment = document.createDocumentFragment();
-		fragment.append(...current.childNodes);
-		
-		for(const line of lines){
-			if(line !== ""){
-				current.append(line);
-			}else{
-				current.append(document.createElement("br"));
-			}
-			let newParagraph = document.createElement("div");
-			newParagraph.className = "BLOCK paragraph";
-			current.after(newParagraph);
-			previous = current;
-			current = newParagraph;
-		}
 		current.remove();
 		previous.appendChild(fragment);
 		current = previous;
 	}else{
-		const afterRange = document.createRange();
-		afterRange.selectNodeContents(paragraph);
-		afterRange.setStart(range.startContainer, range.startOffset);
-		const fragment = afterRange.extractContents();
-		
-		for(const line of lines){
-			if(line !== ""){
-				current.append(line);
-			}else{
-				current.append(document.createElement("br"));
-			}
-			let newParagraph = document.createElement("div");
-			newParagraph.className = "BLOCK paragraph";
-			current.after(newParagraph);
-			previous = current;
-			current = newParagraph;
-		}
 		current.remove();
 		previous.appendChild(fragment);
 		current = previous;
@@ -529,11 +543,7 @@ async function handleCtrlV(event){
 	
 	const newRange = range.cloneRange();
 	
-	newRange.collapse(true);
-	
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	setSelect(newRange,true);
 	return true;
 }
 function handleCtrlS(){
@@ -541,16 +551,10 @@ function handleCtrlS(){
 }
 function handleCtrlD(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
+	const range = getRange(selection);
+	if(!range) return false;
 	
-	const range = selection.getRangeAt(0).cloneRange();
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
 	const copy = paragraph.cloneNode(true);
@@ -607,8 +611,6 @@ function getTextPosition(root, charOffset) {
 function restoreState(state){
 	Content.innerHTML = state.content;
 	
-	
-	
 	if(state.select.start === -1 || state.select.end === -1) return;
 	
 	const selection = window.getSelection();
@@ -643,63 +645,42 @@ function handleCtrlY(){
 
 content.addEventListener("keydown", e => {
 	if(e.key === "Backspace"){
-		if(handleBackspace()){
-			e.preventDefault();
-	}}
+		if(handleBackspace()) e.preventDefault();
+	}
 	if(e.key === "Delete"){
-		if(handleDelete()){
-			e.preventDefault();
-	}}
+		if(handleDelete()) e.preventDefault();
+	}
 	if(e.key === "Enter"){
-		if(handleEnter()){
-			e.preventDefault();
-	}}
+		if(handleEnter()) e.preventDefault();
+	}
 	if(e.key === "ArrowUp"){
-		if(handleArrowUp()){
-			e.preventDefault();
-	}}
+		if(handleArrowUp()) e.preventDefault();
+	}
 	if(e.key === "ArrowDown"){
-		if(handleArrowDown()){
-			e.preventDefault();
-	}}
+		if(handleArrowDown()) e.preventDefault();
+	}
 	if(e.key === "ArrowLeft"){
-		if(handleArrowLeft()){
-			e.preventDefault();
-	}}
+		if(handleArrowLeft()) e.preventDefault();
+	}
 	if(e.key === "ArrowRight"){
-		if(handleArrowRight()){
-			e.preventDefault();
-	}}
+		if(handleArrowRight()) e.preventDefault();
+	}
 });
 function hasText(node){
 	const walker = document.createTreeWalker(node,NodeFilter.SHOW_TEXT);
 	return walker.nextNode() !== null;
 }
 function insideTable(range){
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const cell = node.closest("td");
-	
-	if(cell){
-		return true;
-	}
+	const cell = getClosest(range,"td");
+	if(cell) return true;
 	return false;
 }
 function deleteParagraphSelection(selection){
-	
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	if(range.collapsed) return false;
-	let node = range.startContainer;
 	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	let start = node.closest(".paragraph");
+	let start = getClosest(range,".paragraph");
 	if(!start) return true;
 	
 	let cur = start;
@@ -715,9 +696,7 @@ function deleteParagraphSelection(selection){
 			}else if(startIn&&endIn){
 				const r = range.cloneRange();
 				range.deleteContents();
-				r.collapse(true);
-				selection.removeAllRanges();
-				selection.addRange(r);
+				setSelect(r,true);
 				return true;
 			}else if(startIn){
 				elmrange.setStart(range.startContainer, range.startOffset);
@@ -727,9 +706,7 @@ function deleteParagraphSelection(selection){
 				elmrange.setEnd(range.endContainer, range.endOffset);
 				elmrange.deleteContents();
 				const r = range.cloneRange();
-				r.collapse(true);
-				selection.removeAllRanges();
-				selection.addRange(r);
+				setSelect(r,true);
 				start.append(...Array.from(cur.childNodes));
 				cur.remove();
 				return true;
@@ -750,150 +727,90 @@ function deleteParagraphSelection(selection){
 }
 function handleBackspace(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
 	
 	pushUndo();
 	
 	if(deleteParagraphSelection(selection)) return true;
 	
-	const range = selection.getRangeAt(0).cloneRange();
-	let node = range.startContainer;
+	const range = getRange(selection);
+	if(!range) return false;
 	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	const test = range.cloneRange();
-	range.selectNodeContents(paragraph);
-	range.setEnd(test.startContainer, test.startOffset);
-	
-	const atStart = range.toString() === "";
+	const atStart = isAtEnd(range,paragraph,true);
 	if(!atStart) return false;
 	
-	const current = paragraph;
-	let previous = current.previousElementSibling;
-	
-	while(previous && !previous.classList.contains("paragraph")){
-		previous = previous.previousElementSibling;
-	}
-	
+	let previous = findNextElm(paragraph,"paragraph",false);
 	if(!previous) return true;
-	
-	const afterRange = document.createRange();
-	afterRange.selectNodeContents(paragraph);
-	afterRange.setStart(range.startContainer, range.startOffset);
 	
 	let HasText = false;
 	if(hasText(paragraph)) HasText = true;
 	
-	const fragment = afterRange.extractContents();
+	const fragment = extractRange(paragraph,range);
 	
 	paragraph.remove();
 	
-	const newRange = document.createRange();
-	
-	newRange.selectNodeContents(previous);
-	newRange.collapse(false);
+	const newRange = selectElm(previous);
 	
 	if(!hasText(previous)){
 		previous.innerHTML = "";
 		previous.appendChild(fragment);
 	}else if(HasText){ previous.appendChild(fragment); }
 	
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	setSelect(newRange,false);
 	return true;
 }
 function handleDelete(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
 	
 	pushUndo();
 	
 	if(deleteParagraphSelection(selection)) return true;
 	
-	const range = selection.getRangeAt(0).cloneRange();
-	let node = range.startContainer;
+	const range = getRange(selection);
+	if(!range) return false;
 	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	const endTest = range.cloneRange();
-	endTest.selectNodeContents(paragraph);
-	endTest.setStart(range.startContainer, range.startOffset);
-	const atEnd = endTest.toString() === "";
-	
+	const atEnd = isAtEnd(range,paragraph,false);
 	if(!atEnd) return false;
 	
-	const current = paragraph;
-	let next = current.nextElementSibling;
-	
-	while(next && !next.classList.contains("paragraph")){
-		next = next.nextElementSibling;
-	}
-	
+	let next = findNextElm(paragraph,"paragraph",true);
 	if(!next) return true;
-	
-	const afterRange = document.createRange();
-	afterRange.selectNodeContents(next);
 	
 	let HasText = false;
 	if(hasText(next)) HasText = true;
 	
-	const fragment = afterRange.extractContents();
-	
+	const fragment = extractRange(next,range,true);
 	next.remove();
 	
-	const newRange = document.createRange();
-	
-	newRange.selectNodeContents(paragraph);
-	newRange.collapse(false);
+	const newRange = selectElm(paragraph);
 	
 	if(!hasText(paragraph)){
 		paragraph.innerHTML = "";
 		paragraph.appendChild(fragment);
 	}else if(HasText){ paragraph.appendChild(fragment); }
 	
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	setSelect(newRange,false);
 	return true;
 }
 function handleEnter(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
 	
 	pushUndo();
 	
 	deleteParagraphSelection(selection);
 	
-	const range = selection.getRangeAt(0).cloneRange();
-	let node = range.startContainer;
+	const range = getRange(selection);
+	if(!range) return false;
 	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	const startTest = range.cloneRange();
-	startTest.selectNodeContents(paragraph);
-	startTest.setEnd(range.startContainer, range.startOffset);
-	const atStart = startTest.toString() === "";
-	
-	const endTest = range.cloneRange();
-	endTest.selectNodeContents(paragraph);
-	endTest.setStart(range.startContainer, range.startOffset);
-	const atEnd = endTest.toString() === "";
+	const atStart = isAtEnd(range,paragraph,true);
+	const atEnd = isAtEnd(range,paragraph,false);
 	
 	let newParagraph = null;
 	if(atEnd){
@@ -906,11 +823,7 @@ function handleEnter(){
 		newParagraph.append(...Array.from(paragraph.childNodes));
 		paragraph.appendChild(document.createElement("br"));
 	}else{
-		const afterRange = document.createRange();
-		afterRange.selectNodeContents(paragraph);
-		afterRange.setStart(range.startContainer, range.startOffset);
-		
-		const fragment = afterRange.extractContents();
+		const fragment = extractRange(paragraph,range);
 		
 		newParagraph = document.createElement("div");
 		newParagraph.className = "BLOCK paragraph";
@@ -919,48 +832,27 @@ function handleEnter(){
 	
 	paragraph.after(newParagraph);
 	
-	const newRange = document.createRange();
-	
-	newRange.selectNodeContents(newParagraph);
-	newRange.collapse(true);
-	
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	const newRange = selectElm(newParagraph);
+	setSelect(newRange,true);
 	return true;
 }
 function handleArrowUp(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	if(!range.collapsed) return false;
 	
 	if(insideTable(range)){
 		return Table_handleArrowUp(selection,range);
 	}
 	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	let previous = paragraph.previousElementSibling;
-	
-	while(previous && !previous.classList.contains("paragraph")){
-		previous = previous.previousElementSibling;
-	}
-	
+	let previous = findNextElm(paragraph,"paragraph",false);
 	if(!previous) return true;
 	
-	const before = document.createRange();
-	before.selectNodeContents(paragraph);
-	before.setEnd(range.startContainer, range.startOffset);
-	const offset = before.toString().length;
+	const offset = getOffset(paragraph,range);
 	
 	const walker = document.createTreeWalker(previous,NodeFilter.SHOW_TEXT);
 	let remaining = offset;
@@ -976,46 +868,27 @@ function handleArrowUp(){
 		newRange.setStart(textNode, remaining);
 	}else{
 		newRange.selectNodeContents(previous);
-		newRange.collapse(false);
 	}
-	newRange.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	setSelect(newRange,true);
 	return true;
 }
 function handleArrowDown(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	if(!range.collapsed) return false;
 	
 	if(insideTable(range)){
 		return Table_handleArrowDown(selection,range);
 	}
 	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	let next = paragraph.nextElementSibling;
-	
-	while(next && !next.classList.contains("paragraph")){
-		next = next.nextElementSibling;
-	}
-	
+	let next = findNextElm(paragraph,"paragraph",true);
 	if(!next) return true;
 	
-	const before = document.createRange();
-	before.selectNodeContents(paragraph);
-	before.setEnd(range.startContainer, range.startOffset);
-	const offset = before.toString().length;
+	const offset = getOffset(paragraph,range);
 	
 	const walker = document.createTreeWalker(next,NodeFilter.SHOW_TEXT);
 	let remaining = offset;
@@ -1031,90 +904,54 @@ function handleArrowDown(){
 		newRange.setStart(textNode, remaining);
 	}else{
 		newRange.selectNodeContents(next);
-		newRange.collapse(false);
 	}
-	newRange.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	setSelect(newRange,true);
 	return true;
 }
 function handleArrowLeft(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	if(!range.collapsed) return false;
 	
 	if(insideTable(range)){
 		return Table_handleArrowLeft(selection,range);
 	}
 	
-	let node = range.startContainer;
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	const test = range.cloneRange();
-	range.selectNodeContents(paragraph);
-	range.setEnd(test.startContainer, test.startOffset);
-	const atStart = range.toString() === "";
+	const atStart = isAtEnd(range,paragraph,true);
 	if(!atStart) return false;
 	
-	let previous = paragraph.previousElementSibling;
-	while(previous && !previous.classList.contains("paragraph")){
-		previous = previous.previousElementSibling;
-	}
+	let previous = findNextElm(paragraph,"paragraph",false);
 	if(!previous) return true;
 	
-	const newRange = document.createRange();
-	newRange.selectNodeContents(previous);
-	newRange.collapse(false);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	const newRange = selectElm(previous);
+	setSelect(newRange,false);
 	return true;
 }
 function handleArrowRight(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	if(!range.collapsed) return false;
 	
 	if(insideTable(range)){
 		return Table_handleArrowRight(selection,range);
 	}
 	
-	let node = range.startContainer;
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const paragraph = node.closest(".paragraph");
+	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	const endTest = range.cloneRange();
-	endTest.selectNodeContents(paragraph);
-	endTest.setStart(range.startContainer, range.startOffset);
-	const atEnd = endTest.toString() === "";
+	const atEnd = isAtEnd(range,paragraph,false);
 	if(!atEnd) return false;
 	
-	let next = paragraph.nextElementSibling;
-	while(next && !next.classList.contains("paragraph")){
-		next = next.nextElementSibling;
-	}
+	let next = findNextElm(paragraph,"paragraph",true);
 	if(!next) return true;
 	
-	const newRange = document.createRange();
-	newRange.selectNodeContents(next);
-	newRange.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	const newRange = selectElm(next);
+	setSelect(newRange,true);
 	return true;
 }
 
@@ -1240,11 +1077,8 @@ NewLineBtn.addEventListener("click", function(){
 	paragraph.after(CurrentBlock.block.nextElementSibling);
 	CurrentBlock.block.after(paragraph);
 	
-	const r = document.createRange();
-	r.selectNodeContents(paragraph);
-	r.collapse(true);
-	window.getSelection().removeAllRanges();
-	window.getSelection().addRange(r);
+	const r = selectElm(paragraph);
+	setSelect(r,true);
 });
 
 //IMAGE
@@ -1275,8 +1109,8 @@ document.addEventListener("pointerdown", (e) => {
 });
 ImageBtn.addEventListener("click", function(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return;
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	
 	popupImageInput();
 	showPopup("Select Image", async text =>{
@@ -1376,8 +1210,8 @@ H6_Btn.addEventListener("click", function(){
 });
 ClearBtn.addEventListener("click", function(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return;
-	const range = selection.getRangeAt(0);
+	const range = getRange(selection);
+	if(!range) return false;
 	if(!content.contains(range.commonAncestorContainer)) return;
 	const walker = document.createTreeWalker(content,NodeFilter.SHOW_ELEMENT);
 	
@@ -1483,14 +1317,7 @@ ColumnDelBtn.addEventListener("click", function(){
 	CurrentBlock.cell = null;
 });
 function Table_handleArrowUp(selection,range){
-	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const cell = node.closest("td");
+	const cell = getClosest(range,"td");
 	if(!cell) return false;
 	
 	const row = cell.closest("tr");
@@ -1502,10 +1329,7 @@ function Table_handleArrowUp(selection,range){
 	const targetCell = previousRow.cells[column];
 	if(!targetCell) return true;
 	
-	const before = document.createRange();
-	before.selectNodeContents(cell);
-	before.setEnd(range.startContainer, range.startOffset);
-	const offset = before.toString().length;
+	const offset = getOffset(cell,range);
 	
 	const walker = document.createTreeWalker(targetCell,NodeFilter.SHOW_TEXT);
 	let remaining = offset;
@@ -1521,23 +1345,12 @@ function Table_handleArrowUp(selection,range){
 		newRange.setStart(textNode, remaining);
 	}else{
 		newRange.selectNodeContents(targetCell);
-		newRange.collapse(false);
 	}
-	newRange.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	setSelect(newRange,true);
 	return true;
 }
 function Table_handleArrowDown(selection,range){
-	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const cell = node.closest("td");
+	const cell = getClosest(range,"td");
 	if(!cell) return false;
 	
 	const row = cell.closest("tr");
@@ -1549,10 +1362,7 @@ function Table_handleArrowDown(selection,range){
 	const targetCell = nextRow.cells[column];
 	if(!targetCell) return true;
 	
-	const before = document.createRange();
-	before.selectNodeContents(cell);
-	before.setEnd(range.startContainer, range.startOffset);
-	const offset = before.toString().length;
+	const offset = getOffset(cell,range);
 	
 	const walker = document.createTreeWalker(targetCell,NodeFilter.SHOW_TEXT);
 	let remaining = offset;
@@ -1568,31 +1378,18 @@ function Table_handleArrowDown(selection,range){
 		newRange.setStart(textNode, remaining);
 	}else{
 		newRange.selectNodeContents(targetCell);
-		newRange.collapse(false);
 	}
-	newRange.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	setSelect(newRange,false);
 	return true;
 }
 function Table_handleArrowLeft(selection,range){
-	
-	let node = range.startContainer;
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const cell = node.closest("td");
+	const cell = getClosest(range,"td");
 	if(!cell) return false;
 	
 	const row = cell.parentElement;
 	const index = cell.cellIndex;
 	
-	const test = range.cloneRange();
-	range.selectNodeContents(cell);
-	range.setEnd(test.startContainer, test.startOffset);
-	const atStart = range.toString() === "";
+	const atStart = isAtEnd(range,cell,true);
 	if(!atStart) return false;
 	
 	let targetCell;
@@ -1605,28 +1402,15 @@ function Table_handleArrowLeft(selection,range){
 		targetCell = previousRow.cells[previousRow.cells.length - 1];
 	}
 	
-	const newRange = document.createRange();
-	newRange.selectNodeContents(targetCell);
-	newRange.collapse(false);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	const newRange = selectElm(targetCell);
+	setSelect(newRange,false);
 	return true;
 }
 function Table_handleArrowRight(selection,range){
-	
-	let node = range.startContainer;
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	const cell = node.closest("td");
+	const cell = getClosest(range,"td");
 	if(!cell) return false;
 	
-	const endTest = range.cloneRange();
-	endTest.selectNodeContents(cell);
-	endTest.setStart(range.startContainer, range.startOffset);
-	const atEnd = endTest.toString() === "";
+	const atEnd = isAtEnd(range,cell,false);
 	if(!atEnd) return false;
 	
 	const row = cell.parentElement;
@@ -1642,23 +1426,12 @@ function Table_handleArrowRight(selection,range){
 		targetCell = nextRow.cells[0];
 	}
 	
-	const newRange = document.createRange();
-	newRange.selectNodeContents(targetCell);
-	newRange.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(newRange);
-	
+	const newRange = selectElm(targetCell);
+	setSelect(newRange,true);
 	return true;
 }
 function Table_wrapBasic(selection,range,fm){
-	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	let cell = node.closest("td");
+	let cell = getClosest(range,"td");
 	if(!cell) return true;
 	
 	pushUndo();
@@ -1669,19 +1442,11 @@ function Table_wrapBasic(selection,range,fm){
 	const fragment = range.extractContents();
 	format.appendChild(fragment);
 	range.insertNode(format);
-	r.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(r);
+	setSelect(r,true);
+	return true;
 }
 function Table_wrapAdvan(selection,range,elm){
-	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	let cell = node.closest("td");
+	let cell = getClosest(range,"td");
 	if(!cell) return true;
 	
 	pushUndo();
@@ -1690,19 +1455,11 @@ function Table_wrapAdvan(selection,range,elm){
 	const fragment = range.extractContents();
 	elm.appendChild(fragment);
 	range.insertNode(elm);
-	r.collapse(true);
-	selection.removeAllRanges();
-	selection.addRange(r);
+	setSelect(r,true);
+	return true;
 }
 function Table_handleCtrlV(selection,range,text){
-	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	let cell = node.closest("td");
+	let cell = getClosest(range,"td")
 	if(!cell) return true;
 	
 	pushUndo();
@@ -1711,24 +1468,21 @@ function Table_handleCtrlV(selection,range,text){
 	
 	const r = range.cloneRange();
 	range.insertNode(document.createTextNode(text));
-	r.collapse(false);
-	selection.removeAllRanges();
-	selection.addRange(r);
-	
+	setSelect(r,true);
 	return true;
 }
 
 //POPUP OVERLAY
-const overlay = document.getElementById("overlay");
-const popup = document.getElementById("popup");
-const popup_input = document.getElementById("popupInput");
-const popup_okBtn = document.getElementById("popup-okBtn");
+const overlay         = document.getElementById("overlay");
+const popup           = document.getElementById("popup");
+const popup_input     = document.getElementById("popupInput");
+const popup_okBtn     = document.getElementById("popup-okBtn");
 const popup_cancelBtn = document.getElementById("popup-cancelBtn");
-const popup_file = document.getElementById("popupFile");
-const dropZone = document.getElementById("dropZone");
-let popupCallback = null;
-let popupImage = {isURL: false,value: null};
-let popupActive = false;
+const popup_file      = document.getElementById("popupFile");
+const dropZone        = document.getElementById("dropZone");
+let popupCallback     = null;
+let popupImage        = {isURL: false,value: null};
+let popupActive       = false;
 dropZone.addEventListener("dragenter", () => {dropZone.classList.add("dragover");});
 dropZone.addEventListener("dragleave", () => {dropZone.classList.remove("dragover");});
 dropZone.addEventListener("drop", () => {dropZone.classList.remove("dragover");});
@@ -1751,11 +1505,11 @@ dropZone.addEventListener("paste", async (e) => {
 	
 	for(const item of e.clipboardData.items){
 		if(item.type.startsWith("image/")){
-		const file = item.getAsFile();
-		if(file){
-			popup_handleFile(file);
-			return;
-		}
+			const file = item.getAsFile();
+			if(file){
+				popup_handleFile(file);
+				return;
+			}
 		}
 	}
 	
@@ -1763,7 +1517,6 @@ dropZone.addEventListener("paste", async (e) => {
 	if(text){
 		try{
 			const url = new URL(text);
-			
 			popup_handleImageURL(url.href);
 		}catch{}
 	}
@@ -1851,8 +1604,8 @@ function isURL(str){
 }
 LinkBtn.addEventListener("click", function(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return;
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	if(range.collapsed) return false;
 	
 	popupTextInput();
@@ -1891,23 +1644,13 @@ LinkBtn.addEventListener("click", function(){
 
 function splitParagraph(){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
+	const range = getRange(selection);
+	if(!range) return false;
 	
-	const range = selection.getRangeAt(0).cloneRange();
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	let paragraph = node.closest(".paragraph");
+	let paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return null;
 	
-	const afterRange = document.createRange();
-	afterRange.selectNodeContents(paragraph);
-	afterRange.setStart(range.startContainer, range.startOffset);
-	
-	const fragment = afterRange.extractContents();
+	const fragment = extractRange(paragraph,range);
 	
 	const newParagraph = document.createElement("div");
 	newParagraph.className = "BLOCK paragraph";
@@ -1950,21 +1693,15 @@ function insertBlock(block){
 }
 function wrapBasic(fm){
 	const selection = window.getSelection();
-	if(!selection.rangeCount) return false;
-	const range = selection.getRangeAt(0).cloneRange();
+	const range = getRange(selection);
+	if(!range) return false;
 	if(range.collapsed) return false;
 	
 	if(insideTable(range)){
 		return Table_wrapBasic(selection,range,fm);
 	}
 	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	let start = node.closest(".paragraph");
+	let start = getClosest(range,".paragraph");
 	if(!start) return true;
 	
 	pushUndo();
@@ -1986,10 +1723,8 @@ function wrapBasic(fm){
 				const fragment = range.extractContents();
 				format.appendChild(fragment);
 				range.insertNode(format);
-				r.collapse(true);
-				selection.removeAllRanges();
-				selection.addRange(r);
-				return;
+				setSelect(r,true);
+				return true;
 			}else if(startIn){
 				elmrange.setStart(range.startContainer, range.startOffset);
 				const format = document.createElement(fm);
@@ -2006,9 +1741,7 @@ function wrapBasic(fm){
 				format.appendChild(fragment);
 				elmrange.insertNode(format);
 				const r = range.cloneRange();
-				r.collapse(true);
-				selection.removeAllRanges();
-				selection.addRange(r);
+				setSelect(r,true);
 				return true;
 			}else{
 				const format = document.createElement(fm);
@@ -2030,8 +1763,8 @@ function wrapBasic(fm){
 function wrapAdvan(elm,range=null){
 	const selection = window.getSelection();
 	if(range===null){
-		if(!selection.rangeCount) return false;
-		range = selection.getRangeAt(0).cloneRange();
+		range = getRange(selection);
+		if(!range) return false;
 	}
 	if(range.collapsed) return false;
 	
@@ -2039,13 +1772,7 @@ function wrapAdvan(elm,range=null){
 		return Table_wrapAdvan(selection,range,elm);
 	}
 	
-	let node = range.startContainer;
-	
-	if(node.nodeType === Node.TEXT_NODE){
-		node = node.parentElement;
-	}
-	
-	let start = node.closest(".paragraph");
+	let start = getClosest(range,".paragraph");
 	if(!start) return true;
 	
 	pushUndo();
@@ -2066,10 +1793,8 @@ function wrapAdvan(elm,range=null){
 				const format = elm.cloneNode(false);
 				format.appendChild(fragment);
 				range.insertNode(format);
-				r.collapse(true);
-				selection.removeAllRanges();
-				selection.addRange(r);
-				return;
+				setSelect(r,true);
+				return true;
 			}else if(startIn){
 				elmrange.setStart(range.startContainer, range.startOffset);
 				const fragment = elmrange.extractContents();
@@ -2084,9 +1809,7 @@ function wrapAdvan(elm,range=null){
 				format.appendChild(fragment);
 				elmrange.insertNode(format);
 				const r = range.cloneRange();
-				r.collapse(true);
-				selection.removeAllRanges();
-				selection.addRange(r);
+				setSelect(r,true);
 				return true;
 			}else{
 				const fragment = elmrange.extractContents();
