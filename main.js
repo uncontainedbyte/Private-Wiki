@@ -56,7 +56,7 @@ function getOffset(elm,range){
 }
 function findNextElm(elm,type,isNext){
 	let result = (isNext)?elm.nextElementSibling:elm.previousElementSibling;
-	while(next && !result.classList.contains(type)){
+	while(result && !result.classList.contains(type)){
 		result = (isNext)?result.nextElementSibling:result.previousElementSibling;
 	}
 	return result;
