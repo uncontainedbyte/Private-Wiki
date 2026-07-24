@@ -19,7 +19,7 @@ function getClosest(range,elmName){
 		node = node.parentElement;
 	}
 	
-	let cell = node.closest("td");
+	return node.closest(elmName);
 }
 function getRange(selection){
 	if(!selection.rangeCount) return null;
@@ -44,8 +44,8 @@ function extractRange(paragraph,range,selectAll=false){
 function isAtEnd(range,elm,isStart){
 	const test = range.cloneRange();
 	test.selectNodeContents(elm);
-	if(!Start) test.setStart(range.startContainer, range.startOffset);
-	if(Start) test.setEnd(range.startContainer, range.startOffset);
+	if(!isStart) test.setStart(range.startContainer, range.startOffset);
+	if(isStart) test.setEnd(range.startContainer, range.startOffset);
 	return (test.toString() === "");
 }
 function getOffset(elm,range){
@@ -465,7 +465,7 @@ async function handleCtrlV(event){
 	const paragraph = getClosest(range,".paragraph");
 	if(!paragraph) return false;
 	
-	event.preventDefault();
+	if(event) event.preventDefault();
 	pushUndo();
 	
 	deleteParagraphSelection(selection);
